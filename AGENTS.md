@@ -98,6 +98,6 @@ npm run dev       # Vite 开发服 5173（代理 /api → 8788）
 
 **`/api/cross`：** 共同 uid 的周期均分 + 逐人 `pairSample`（前端已不再展示明细表，仅用汇总）
 
-**`/api/cross/dist`（方案 3）：**
-查询参数：`gameId`、`gameId2`、`sourceGame`、`targetGame`、`sourceBucket`（neg/mid/pos）、`grain`（month/day）、`from`/`to`
-返回 `periods[]`：每期 `n`、`neg`/`mid`/`pos` 占比
+**`/api/cross/dist`（二分四格，产品确认）：**
+好评 = grade_mapped ≥8（4–5 星）；差评 = 0/2/4/6。源评价：uid 在源游戏全部评论均分 ≥8 为好。
+返回 `overview` + `periods[]` 的 `pp/pn/np/nn`（好→好/好→差/差→好/差→差），并含 `chi2/p/phi/related`。

@@ -159,14 +159,10 @@ fn play_bucket(days: f64) -> &'static str {
         "0"
     } else if days <= 30.0 {
         "1-30"
-    } else if days <= 90.0 {
-        "31-90"
-    } else if days <= 180.0 {
-        "91-180"
     } else if days <= 365.0 {
-        "181-365"
+        "31-365"
     } else {
-        "365+"
+        "366+"
     }
 }
 
@@ -196,7 +192,7 @@ fn cmd_factors(path: &str, grain: &str, from: &str, to: &str) {
         acc_add(overall.entry(b.clone()).or_default(), gm);
         acc_add(by.entry(pk).or_default().entry(b).or_default(), gm);
     }
-    let buckets = ["0", "1-30", "31-90", "91-180", "181-365", "365+"];
+    let buckets = ["0", "1-30", "31-365", "366+"];
     let mut out = String::from("{\"series\":[");
     let mut first = true;
     for (period, m) in by {

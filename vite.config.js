@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [vue()],
   base: "./",
   build: {
-    outDir: "../app/dist",
+    outDir: path.resolve(__dirname, "app", "dist"),
     emptyOutDir: true,
     rollupOptions: {
       input: {

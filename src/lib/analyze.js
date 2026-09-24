@@ -224,7 +224,7 @@ function hitKeyword(content, keyword) {
 
 /** 四因子固定升序（图例/总表顺序，勿用 localeCompare 字典序） */
 export const FACTOR_ORDER = {
-  play_duration: ["0", "1-30", "31-90", "91-180", "181-365", "365+"],
+  play_duration: ["0", "1-30", "31-365", "366+"],
   user_level: ["0", "1", "2", "3", "4", "5", "6"],
   content_len: ["≤20", "21-80", "81-200", "201+"],
   device_type: DEVICE_ORDER,

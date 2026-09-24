@@ -309,7 +309,8 @@ export async function computeStatsStream(gameId, root) {
     total++;
     const g = Number(c.grade) || 0;
     if (g >= 0 && g <= 10) gradeDist[g]++;
-    if (g > 0) {
+    // 与 analyze.js 一致：0 分计入均分
+    if (Number.isFinite(g)) {
       sumGrade += g;
       gradeN++;
     }
