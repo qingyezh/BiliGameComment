@@ -1,0 +1,18 @@
+{
+  "name": "biligame-review-crawler",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "三进程：web 控制台 / ingest 入库 / crawl 爬取",
+  "scripts": {
+    "web": "node src/server.js",
+    "ingest": "node src/ingest-daemon.js",
+    "crawl": "node src/crawl-daemon.js",
+    "analyze": "node src/analyze-server.js",
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

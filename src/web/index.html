@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B站游戏评论采集控制台</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <h1>B站游戏评论采集控制台</h1>
+          <p class="sub">biligame · 全量主评论 · 单游戏串行 · 自动刷新 0.5s</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="connBadge" class="badge">连接中…</span>
+        <span id="refreshBadge" class="badge">刷新 —</span>
+        <a class="btn ghost" href="/api/export/csv" id="btnCsv">导出 CSV</a>
+        <a class="btn ghost" href="/api/export/jsonl" id="btnJsonl">导出 JSONL</a>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel controls">
+        <section>
+          <h2>目标游戏</h2>
+          <label class="field">
+            <span>Game ID</span>
+            <div class="row">
+              <input id="gameId" type="text" value="103496" placeholder="如 103496" />
+              <button id="btnPreview" class="btn" type="button">预览</button>
+            </div>
+          </label>
+          <div id="gameCard" class="game-card hidden">
+            <img id="gameIcon" alt="" />
+            <div>
+              <div id="gameTitle" class="game-title"></div>
+              <div id="gameMeta" class="game-meta"></div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Cookie</h2>
+          <label class="field">
+            <span>浏览器 Cookie（含 SESSDATA）</span>
+            <textarea id="cookie" rows="4" placeholder="SESSDATA=...; bili_jct=...; buvid3=..."></textarea>
+          </label>
+          <div class="row">
+            <button id="btnSaveCookie" class="btn" type="button">保存到本地</button>
+            <span id="cookieState" class="hint"></span>
+          </div>
+        </section>
+
+        <section>
+          <h2>采集模式</h2>
+          <label class="field">
+            <span>任务类型</span>
+            <select id="mode">
+              <option value="full_resume">全量续爬（从断点继续）</option>
+              <option value="full_restart">全量重来（从第 1 页）</option>
+              <option value="incremental">增量更新（重复自动停）</option>
+            </select>
+          </label>
+          <div class="grid2">
+            <label class="field">
+              <span>page_size（≤20）</span>
+              <input id="pageSize" type="number" min="1" max="20" value="20" />
+            </label>
+            <label class="field">
+              <span>rank_type</span>
+              <input id="rankType" type="number" value="3" />
+            </label>
+            <label class="field">
+              <span>间隔 ms（≥600 + 抖动 0–200）</span>
+              <input id="delayMs" type="number" min="600" value="600" />
+            </label>
+            <label class="field">
+              <span>试跑页数（空=不限）</span>
+              <input id="maxPages" type="number" min="1" placeholder="例如 5" />
+            </label>
+          </div>
+          <label class="check">
+            <input id="dupStop" type="checkbox" checked />
+            <span>增量：大量重复自动停</span>
+          </label>
+          <div class="grid2">
+            <label class="field">
+              <span>重复窗口</span>
+              <input id="dupWindow" type="number" min="5" value="50" />
+            </label>
+            <label class="field">
+              <span>重复阈值</span>
+              <input id="dupThreshold" type="number" min="1" value="45" />
+            </label>
+          </div>
+          <label class="check">
+            <input id="saveRaw" type="checkbox" />
+            <span>额外保存 raw 页 JSONL</span>
+          </label>
+        </section>
+
+        <section class="actions">
+          <button id="btnStart" class="btn primary" type="button">开始采集</button>
+          <button id="btnStop" class="btn danger" type="button" disabled>停止</button>
+        </section>
+
+        <section>
+          <h2>断点</h2>
+          <div id="cursorBox" class="cursor-box">读取中…</div>
+        </section>
+
+        <section>
+          <h2>已存数据</h2>
+          <ul id="gameList" class="game-list"></ul>
+        </section>
+      </aside>
+
+      
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

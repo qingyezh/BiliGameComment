@@ -1,0 +1,223 @@
+/* Vue3 + Element Plus 主题微调（业务布局仍用少量工具类） */
+:root {
+  --el-color-primary: #2f80ed;
+  --el-border-radius-base: 8px;
+  --app-bg: #f4f6fa;
+}
+
+html, body, #app {
+  margin: 0;
+  min-height: 100%;
+  background: var(--app-bg);
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #1f2a37;
+}
+
+.app-shell { min-height: 100vh; }
+.hero {
+  padding: 14px 6% 8px;
+}
+.hero-title { display: flex; gap: 12px; align-items: center; }
+.logo {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, #56ccf2, #2f80ed 50%, #22c55e);
+}
+.hero h1 { margin: 0; font-size: 18px; }
+.hero .sub { color: #6b7a90; font-size: 12px; margin-top: 2px; }
+
+.el-main {
+  padding-top: 4px;
+  padding-left: 6%;
+  padding-right: 6%;
+  max-width: 100%;
+}
+@media (max-width: 720px) {
+  .el-main { padding-left: 4%; padding-right: 4%; }
+}
+.toolbar-card { margin-bottom: 12px; }
+.toolbar {
+  display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+}
+.toolbar .field {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #6b7a90;
+}
+.main-tabs { background: transparent; }
+
+.kpis {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;
+}
+.kpi-label { font-size: 12px; color: #6b7a90; }
+.kpi-value { font-family: Consolas, monospace; font-size: 22px; margin-top: 4px; }
+.kpi-value.pos { color: #1fa97a; }
+.kpi-value.neg { color: #e25555; }
+
+.card-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.chart-box {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  overflow: visible;
+}
+.chart-box canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+.el-card__body {
+  overflow: visible;
+  min-width: 0;
+}
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center;
+  margin-top: 8px; font-size: 12px;
+}
+.legend-item {
+  border: 0; background: transparent; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 2px 4px; font: inherit; color: #1f2a37;
+}
+.legend-item.off { opacity: 0.35; text-decoration: line-through; }
+.legend-item i {
+  width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+}
+.mono { font-family: Consolas, monospace; font-size: 12px; }
+.kw-meta { margin-top: 8px; font-size: 12px; color: #6b7a90; }
+.kw-actions { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.hit-tag { margin-right: 4px; }
+
+/* 区块分割：卡片之间可加的视觉间隔条 */
+.section-gap {
+  height: 20px;
+  margin: 4px 0 16px;
+  border-top: 1px solid #e8eef5;
+  border-bottom: 1px solid #f6f8fb;
+  background: linear-gradient(
+    180deg,
+    rgba(244, 246, 250, 0.9),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+/* Element Plus 表格强制占满（防挤在左侧） */
+.el-card__body { width: 100%; }
+/* 图表/表格卡片：明确边界与间距，避免区域粘连 */
+.el-card {
+  width: 100%;
+  margin-bottom: 16px;
+  border: 1px solid #e5eaf2 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(31, 42, 55, 0.04) !important;
+  overflow: visible !important;
+}
+.el-card__header {
+  border-bottom: 1px solid #e5eaf2 !important;
+  padding: 12px 16px !important;
+  background: #fafbfc;
+}
+.el-card__body {
+  padding-top: 12px !important;
+}
+.el-card + .el-card {
+  /* 相邻卡片强制隔开 */
+  margin-top: 20px;
+  border-top: 2px solid #eef2f7 !important;
+}
+.kw-meta {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5eaf2;
+  font-size: 12px;
+  color: #6b7a90;
+}
+.legend {
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+.el-tabs__content {
+  padding-top: 8px;
+}
+.el-tab-pane > .el-card:last-child {
+  margin-bottom: 24px;
+}
+/* Vue 表格：自动铺满容器 */
+.app-table {
+  width: 100% !important;
+}
+.app-table .el-table__header th.el-table__cell {
+  background: #f5f8fc;
+  color: #6b7a90;
+  font-weight: 600;
+  font-size: 12px;
+}
+.app-table .el-table__cell {
+  font-size: 13px;
+}
+.app-table .cell {
+  width: 100%;
+}
+.el-card__body > .app-table {
+  display: block;
+  width: 100% !important;
+}
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  white-space: nowrap;
+}
+.data-table th {
+  background: #f5f8fc;
+  color: #6b7a90;
+  font-weight: 600;
+  font-size: 12px;
+}
+.data-table tr:last-child td { border-bottom: 0; }
+.data-table td.num,
+.data-table th.num {
+  text-align: right;
+  font-family: Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.data-table .muted { color: #94a3b8; font-family: Consolas, monospace; font-size: 12px; }
+.data-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+}
+.kpi-card {
+  border: 1px solid #e5eaf2;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 16px;
+}
+.wrap-cell {
+  white-space: normal !important;
+  max-width: 420px;
+  line-height: 1.45;
+}
+.mean-row td {
+  background: #fff8e8;
+  font-weight: 650;
+  color: #8a6d1a;
+}
+.el-table__inner-wrapper,
+.el-table__body-wrapper {
+  width: 100% !important;
+}
+.el-table .el-table__header-wrapper,
+.el-table .el-table__body-wrapper {
+  min-width: 100%;
+}
+.full-w { width: 100% !important; display: block; }
+
+@media (max-width: 720px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi-value { font-size: 18px; }
+  .chart-box { height: 320px; }
+}

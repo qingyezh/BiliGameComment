@@ -1,0 +1,11 @@
+node_modules/
+config.local.json
+data/
+app/data/
+app/cache/
+app/dist/
+app/logs/
+src/tools/analyze-rs/target/
+temp/
+*.log
+version.md
