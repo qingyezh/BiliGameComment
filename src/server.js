@@ -15,11 +15,14 @@ import {
   readTimeline,
 } from "./lib/store.js";
 import { fetchCommentSummary, fetchGameInfo } from "./lib/api.js";
+import { cachedCompute, commentsPath, fingerprintOf } from "./lib/cache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', 'app');
 const PORT = Number(process.env.PORT) || 8787;
 const CONFIG_PATH = path.join(ROOT, "config.local.json");
+/** /api/stats 单飞：同一 game 只允许一次全库扫描 */
+const statsInflight = new Map();
 
 function loadConfig() {
   try {
@@ -256,7 +259,13 @@ async function handleApi(req, res, url) {
     } catch {
       /* ignore */
     }
-    const running = crawl?.status === "running" || (cmd?.action === "start" && crawl?.status !== "stopped" && crawl?.status !== "done");
+    // running：本游戏 runtime 为 running，或 cmd 指向本游戏且 runtime 尚未终态
+    const cmdTargetsThisGame =
+      cmd?.action === "start" && (!cmd.gameId || String(cmd.gameId) === String(gameId));
+    const statusFile = crawl?.status || "";
+    const running =
+      statusFile === "running" ||
+      (cmdTargetsThisGame && statusFile !== "stopped" && statusFile !== "done" && statusFile !== "");
     const rate = Number(crawl?.ratePerSec) || 0;
     const pageCount = Number(crawl?.pageCount) || 0;
     const donePages = Math.max(0, (Number(crawl?.nextPage) || 1) - 1);
@@ -329,6 +338,8 @@ async function handleApi(req, res, url) {
   }
 
   // B：采集进行中不扫全库；force=1 才全量
+  // 全量 computeStatsStream 扫 comments.jsonl 可达 10s+，必须缓存 + 单飞，
+  // 否则 tick 轮询会把事件循环占满，页面表现成「连接不上」
   if (p === "/api/stats" && method === "GET") {
     const gameId = url.searchParams.get("gameId") || config.defaultGameId;
     const force = url.searchParams.get("force") === "1";
@@ -342,7 +353,22 @@ async function handleApi(req, res, url) {
         meta: readGameInfo(gameId, ROOT),
       });
     }
-    const stats = await computeStatsStream(gameId, ROOT);
+    const fp = fingerprintOf(commentsPath(ROOT, gameId));
+    const cacheKey = `stats|${gameId}`;
+    let pending = statsInflight.get(cacheKey);
+    if (!pending) {
+      pending = cachedCompute(
+        ROOT,
+        cacheKey,
+        fp,
+        () => computeStatsStream(gameId, ROOT),
+        force
+      ).finally(() => {
+        statsInflight.delete(cacheKey);
+      });
+      statsInflight.set(cacheKey, pending);
+    }
+    const stats = await pending;
     return sendJson(res, 200, {
       gameId,
       light: false,

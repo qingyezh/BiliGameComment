@@ -65,6 +65,7 @@ function escapeHtml(s) {
 
 function logLine(line) {
   const box = $("#log");
+  if (!box) return;
   const div = document.createElement("div");
   div.className = `line ${line.level || "info"}`;
   const ts = (line.ts || new Date().toISOString()).replace("T", " ").slice(0, 19);
@@ -74,50 +75,74 @@ function logLine(line) {
   while (box.children.length > 500) box.removeChild(box.firstChild);
 }
 
+/** 只改按钮，不写左侧表单 */
+function setRunningUI(running, stopping = false) {
+  const busy = !!(running || stopping);
+  const startBtn = $("#btnStart");
+  const stopBtn = $("#btnStop");
+  if (startBtn) startBtn.disabled = busy;
+  if (stopBtn) stopBtn.disabled = !busy;
+}
+
 function applyStatus(st) {
   const running = !!(st && st.running);
-  $("#btnStart").disabled = running;
-  $("#btnStop").disabled = !running;
+  const stopping = !!(st && st.stopping);
+  setRunningUI(running, stopping);
 
   const dot = $("#statusDot");
   const text = $("#statusText");
-  dot.className = "dot";
-  if (!st || (!st.running && !st.gameId)) {
-    text.textContent = "空闲";
-  } else if (st.stopping) {
-    dot.classList.add("paused");
-    text.textContent = "正在停止…";
-  } else if (running) {
-    dot.classList.add("running");
-    text.textContent = `采集中 · ${st.mode || ""}`;
-  } else if (st.stoppedByDup) {
-    dot.classList.add("paused");
-    text.textContent = "增量已采完（重复自动停）";
-  } else if (st.lastError && st.errorCount >= 8) {
-    dot.classList.add("error");
-    text.textContent = "异常停止";
-  } else if (st.gameId) {
-    dot.classList.add("paused");
-    text.textContent = "已停止 / 可续爬";
+  if (dot) dot.className = "dot";
+  if (text) {
+    if (!st || (!st.running && !st.gameId)) {
+      text.textContent = "空闲";
+    } else if (st.stopping) {
+      if (dot) dot.classList.add("paused");
+      text.textContent = "正在停止…";
+    } else if (running) {
+      if (dot) dot.classList.add("running");
+      text.textContent = `采集中 · ${st.mode || ""}`;
+    } else if (st.stoppedByDup) {
+      if (dot) dot.classList.add("paused");
+      text.textContent = "增量已采完（重复自动停）";
+    } else if (st.lastError && st.errorCount >= 8) {
+      if (dot) dot.classList.add("error");
+      text.textContent = "异常停止";
+    } else if (st.gameId) {
+      if (dot) dot.classList.add("paused");
+      text.textContent = "已停止 / 可续爬";
+    }
   }
 
   if (st && st.gameId) {
     const idInput = $("#gameId");
     if (idInput && !idInput.value && !isFormFocused()) idInput.value = st.gameId;
-    $("#progressTitle").textContent = st.title || `Game ${st.gameId}`;
-    const completed = st.pageCount ? Math.min(st.pageCount, Math.max(0, (st.pageNum || 1) - 1)) : st.sessionPages;
+    const titleEl = $("#progressTitle");
+    if (titleEl) titleEl.textContent = st.title || `Game ${st.gameId}`;
+    const completed = st.pageCount
+      ? Math.min(st.pageCount, Math.max(0, (st.pageNum || 1) - 1))
+      : st.sessionPages;
     const pct = st.pageCount ? Math.min(100, (completed / st.pageCount) * 100) : 0;
-    $("#pctText").textContent = st.pageCount ? `${pct.toFixed(1)}%` : "—";
-    $("#barFg").style.width = `${pct}%`;
+    const pctText = $("#pctText");
+    if (pctText) pctText.textContent = st.pageCount ? `${pct.toFixed(1)}%` : "—";
+    const barFg = $("#barFg");
+    if (barFg) barFg.style.width = `${pct}%`;
     const C = 2 * Math.PI * 52;
-    $("#ringFg").style.strokeDashoffset = String(C * (1 - pct / 100));
-    $("#mCount").textContent = fmt(st.seenCount ?? st.crawledCount);
-    $("#mNew").textContent = fmt(st.sessionNew ?? 0);
-    $("#mPage").textContent = st.pageCount
-      ? `${fmt(Math.max(0, (st.pageNum || 1) - 1))} / ${fmt(st.pageCount)}`
-      : `${fmt(st.sessionPages)} 页`;
-    $("#mRate").textContent = st.ratePerSec ?? 0;
-    $("#mEta").textContent = fmtEta(st.etaSec);
+    const ringFg = $("#ringFg");
+    if (ringFg) ringFg.style.strokeDashoffset = String(C * (1 - pct / 100));
+    const set = (id, v) => {
+      const el = $(id);
+      if (el) el.textContent = v;
+    };
+    set("#mCount", fmt(st.seenCount ?? st.crawledCount));
+    set("#mNew", fmt(st.sessionNew ?? 0));
+    set(
+      "#mPage",
+      st.pageCount
+        ? `${fmt(Math.max(0, (st.pageNum || 1) - 1))} / ${fmt(st.pageCount)}`
+        : `${fmt(st.sessionPages)} 页`
+    );
+    set("#mRate", String(st.ratePerSec ?? 0));
+    set("#mEta", fmtEta(st.etaSec));
     state.gameId = st.gameId;
   }
 }
@@ -287,9 +312,14 @@ async function previewGame() {
   logLine({ level: "info", msg: `预览 ${data.title || id}：评论 ${fmt(data.commentNumber)}，均分 ${data.grade}` });
 }
 
+let crawlBusy = false;
+
 async function startCrawl() {
+  if (crawlBusy) return;
   const id = gameId();
   if (!id) return alert("请填写 gameId");
+  crawlBusy = true;
+  setRunningUI(true, false);
   const maxPagesRaw = $("#maxPages").value.trim();
   const mode = $("#mode").value;
   const payload = {
@@ -305,23 +335,45 @@ async function startCrawl() {
     dupWindow: Number($("#dupWindow").value) || 50,
     dupThreshold: Number($("#dupThreshold").value) || 45,
   };
-  await api("/api/crawl/start", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  logLine({ level: "info", msg: `已发起采集 mode=${mode}` });
+  try {
+    await api("/api/crawl/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    logLine({ level: "info", msg: `已发起采集 mode=${mode}` });
+    setRunningUI(true, false);
+  } catch (e) {
+    setRunningUI(false, false);
+    throw e;
+  } finally {
+    crawlBusy = false;
+    // 立即对齐真实状态（带 gameId）
+    refreshStatus().catch(() => {});
+  }
 }
 
 async function stopCrawl() {
-  await api("/api/crawl/stop", { method: "POST" });
-  logLine({ level: "warn", msg: "已请求停止" });
+  if (crawlBusy) return;
+  crawlBusy = true;
+  setRunningUI(true, true); // 停止中：锁开始、保持停止可点
+  try {
+    await api("/api/crawl/stop", { method: "POST" });
+    logLine({ level: "warn", msg: "已请求停止" });
+    setRunningUI(true, true);
+  } catch (e) {
+    setRunningUI(true, false);
+    throw e;
+  } finally {
+    crawlBusy = false;
+    refreshStatus().catch(() => {});
+  }
 }
 
 async function refreshStatus() {
-  if (isFormFocused()) return;
   try {
-    const st = await api("/api/crawl/status");
+    const gid = gameId() || state.gameId || undefined;
+    const st = await api(`/api/crawl/status${gid ? `?gameId=${encodeURIComponent(gid)}` : ""}`);
     applyStatus(st);
     if (Array.isArray(st.logs) && st.logs.length) {
       const box = $("#log");
@@ -421,20 +473,48 @@ async function loadTimeline() {
 }
 
 function bindEvents() {
-  $("#btnPreview").onclick = () => previewGame().catch((e) => alert(e.message));
-  $("#btnSaveCookie").onclick = () => saveCookie().catch((e) => alert(e.message));
-  $("#btnStart").onclick = () => startCrawl().catch((e) => alert(e.message));
-  $("#btnStop").onclick = () => stopCrawl().catch((e) => alert(e.message));
-  $("#btnClearLog").onclick = () => { $("#log").innerHTML = ""; };
+  const on = (sel, fn) => {
+    const el = $(sel);
+    if (el) el.onclick = fn;
+  };
+  on("#btnPreview", () => previewGame().catch((e) => alert(e.message)));
+  on("#btnSaveCookie", () => saveCookie().catch((e) => alert(e.message)));
+  on("#btnStart", () => startCrawl().catch((e) => alert(e.message)));
+  on("#btnStop", () => stopCrawl().catch((e) => alert(e.message)));
+  on("#btnClearLog", () => {
+    const box = $("#log");
+    if (box) box.innerHTML = "";
+  });
+}
+
+let tickBusy = false;
+async function tick() {
+  if (tickBusy) return;
+  tickBusy = true;
+  try {
+    // stats 扫全库很贵，不进 1.5s 心跳；单独低频刷新
+    // 状态/按钮必须始终刷新（左侧表单由 applyStatus 防写回）
+    await Promise.all([refreshStatus(), refreshState(), loadTimeline()]);
+    setConn(true, "已连接");
+  } catch (e) {
+    setConn(false, "连接异常");
+  } finally {
+    tickBusy = false;
+  }
 }
 
 async function boot() {
+  bindEvents();
   await loadConfig();
   await loadStats(false);
   refreshGames();
   tick();
   setInterval(tick, 1500);
   setInterval(refreshGames, 20000);
+  // 采集控制台统计：30s 足够；服务端有文件指纹缓存
+  setInterval(() => {
+    if (!isFormFocused()) loadStats(false);
+  }, 30000);
 }
 
 boot();

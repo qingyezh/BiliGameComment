@@ -28,6 +28,44 @@ const crossMean = ref(true);
 const kpi = ref({ avg: null, delta: null, n: 0, zero: null });
 const serRows = ref([]);
 const facOverall = ref([]);
+const facPeriods = ref([]);
+const facBuckets = ref([]);
+
+const facBucketCols = computed(() => {
+  const names = facBuckets.value.length ? facBuckets.value : facOverall.value.map((x) => x.bucket);
+  return names.map((b, i) => ({ key: "c" + i, label: b }));
+});
+
+const facOverallT = computed(() => {
+  const cols = facBucketCols.value;
+  const find = (b) => facOverall.value.find((x) => x.bucket === b) || {};
+  const names = facBuckets.value.length ? facBuckets.value : facOverall.value.map((x) => x.bucket);
+  const mk = (label, get) => {
+    const o = { label };
+    names.forEach((b, i) => {
+      o[cols[i].key] = get(find(b));
+    });
+    return o;
+  };
+  return [
+    mk("n", (x) => x.n ?? "—"),
+    mk("均分", (x) => (x.avg == null ? "—" : fmt(x.avg, 2))),
+    mk("0分%", (x) => (x.zero_ratio == null ? "—" : fmtPct(x.zero_ratio))),
+  ];
+});
+
+const facPeriodRows = computed(() =>
+  (facPeriods.value || []).map((r) => {
+    const buckets = r.buckets || [];
+    const n = buckets.reduce((a, b) => a + (Number(b.n) || 0), 0);
+    const o = { period: r.period, n: r.n != null ? r.n : n || "—" };
+    facBucketCols.value.forEach((col) => {
+      const x = buckets.find((z) => z.bucket === col.label);
+      o[col.key] = x && x.avg != null ? fmt(x.avg, 2) : "—";
+    });
+    return o;
+  })
+);
 const kwHits = ref(null);
 const kwMeta = ref("");
 const kwCorr = ref(null);
@@ -125,6 +163,7 @@ async function loadCrossDist() {
     crossDist.value = data;
     const rows = data.periods || [];
     crossDistRows.value = rows;
+    const distW = rows.map((r) => Number(r.n) || 0);
     crossDistChart.value = {
       labels: rows.map((r) => r.period),
       kind: "line",
@@ -137,6 +176,7 @@ async function loadCrossDist() {
           dash: false,
           format: "pct",
           values: rows.map((r) => r.pp),
+          weights: distW,
         },
         {
           name: "好→差",
@@ -144,6 +184,7 @@ async function loadCrossDist() {
           dash: false,
           format: "pct",
           values: rows.map((r) => r.pn),
+          weights: distW,
         },
         {
           name: "差→好",
@@ -151,6 +192,7 @@ async function loadCrossDist() {
           dash: true,
           format: "pct",
           values: rows.map((r) => r.np),
+          weights: distW,
         },
         {
           name: "差→差",
@@ -158,6 +200,7 @@ async function loadCrossDist() {
           dash: true,
           format: "pct",
           values: rows.map((r) => r.nn),
+          weights: distW,
         },
       ],
     };
@@ -214,13 +257,24 @@ async function loadSeries() {
     zero: last?.zero_ratio ?? null,
   };
   const labels = rows.map((r) => r.period);
+  const periodN = rows.map((r) => Number(r.n) || 0);
   serChart.value = {
     labels,
     kind: "line",
     yDomain: { yMin: 0, yMax: 10 },
     series: [
-      { name: "局部均分", color: PALETTE[0], values: rows.map((r) => r.avg) },
-      { name: "累计均分", color: "#94a3b8", values: rows.map((r) => r.cum_avg) },
+      {
+        name: "局部均分",
+        color: PALETTE[0],
+        values: rows.map((r) => r.avg),
+        weights: periodN,
+      },
+      {
+        name: "累计均分",
+        color: "#94a3b8",
+        values: rows.map((r) => r.cum_avg),
+        weights: periodN,
+      },
     ],
   };
   let runN = 0;
@@ -266,6 +320,8 @@ async function loadFactors() {
     factor: factor.value,
   });
   facOverall.value = data.overall || [];
+  facBuckets.value = data.buckets || [];
+  facPeriods.value = data.series || [];
   const rows = data.series || [];
   const buckets = data.buckets || [];
   facChart.value = {
@@ -278,6 +334,10 @@ async function loadFactors() {
       values: rows.map((r) => {
         const x = (r.buckets || []).find((z) => z.bucket === b);
         return x ? x.avg : null;
+      }),
+      weights: rows.map((r) => {
+        const x = (r.buckets || []).find((z) => z.bucket === b);
+        return x ? x.n : 0;
       }),
     })),
   };
@@ -326,25 +386,40 @@ async function loadKeywords() {
   const gHit = hitN ? hitSum / hitN : null;
   const gAvg = allN ? allSum / allN : null;
   const gDelta = gHit != null && gAvg != null ? gHit - gAvg : null;
+  // 相关度 RMS 按周期样本量加权：√(Σ n·Δ² / Σ n)
   let ss = 0;
-  let cnt = 0;
+  let wSum = 0;
   for (const r of rows) {
     const k = get(r);
     if (k.hit_avg == null || r.avg == null || gDelta == null) continue;
+    const w = Number(r.n) || 0;
+    if (!w) continue;
     const d = Number(k.hit_avg) - Number(r.avg) - gDelta;
-    ss += d * d;
-    cnt++;
+    ss += w * d * d;
+    wSum += w;
   }
-  kwCorr.value = cnt ? (10 - Math.sqrt(ss / cnt)) / 10 : null;
+  kwCorr.value = wSum ? +((10 - Math.sqrt(ss / wSum)) / 10).toFixed(4) : null;
   kwHitTotal.value = hitN;
+  const periodN = rows.map((r) => Number(r.n) || 0);
+  const hitNList = rows.map((r) => Number(get(r).hit_n) || 0);
   kwChart.value = {
     labels: rows.map((r) => r.period),
     kind: "line",
     yDomain: { yMin: -5, yMax: 10 },
     yRightDomain: maxHit > 0.5 ? { yMin: 0, yMax: 1 } : { yMin: 0, yMax: 0.5 },
     series: [
-      { name: "命中均分", color: PALETTE[0], values: rows.map((r) => get(r).hit_avg) },
-      { name: "全部均分", color: PALETTE[1], values: rows.map((r) => r.avg) },
+      {
+        name: "命中均分",
+        color: PALETTE[0],
+        values: rows.map((r) => get(r).hit_avg),
+        weights: hitNList,
+      },
+      {
+        name: "全部均分",
+        color: PALETTE[1],
+        values: rows.map((r) => r.avg),
+        weights: periodN,
+      },
       {
         name: "Δ 命中−全部",
         color: PALETTE[3],
@@ -353,10 +428,18 @@ async function loadKeywords() {
           if (h == null || r.avg == null) return null;
           return +(Number(h) - Number(r.avg)).toFixed(4);
         }),
+        // 均值口径：全量命中μ − 全量全部μ（≠ 各期差的再平均）
+        meanOverride: gDelta,
       },
     ],
     rightSeries: [
-      { name: "命中率", color: "#0ea5e9", format: "pct", values: rows.map((r) => get(r).hit_rate) },
+      {
+        name: "命中率",
+        color: "#0ea5e9",
+        format: "pct",
+        values: rows.map((r) => get(r).hit_rate),
+        weights: periodN,
+      },
     ],
   };
   kwRows.value = rows;
@@ -399,6 +482,14 @@ async function loadCross() {
     const r = (data.series[gB] || []).find((x) => x.period === p);
     return r ? r.avg : null;
   });
+  const nA = labels.map((p) => {
+    const r = (data.series[gA] || []).find((x) => x.period === p);
+    return r ? Number(r.n) || 0 : 0;
+  });
+  const nB = labels.map((p) => {
+    const r = (data.series[gB] || []).find((x) => x.period === p);
+    return r ? Number(r.n) || 0 : 0;
+  });
   const evalA = labels.map((p) => {
     const r = (data.evalSeries?.[gA] || []).find((x) => x.period === p);
     return r ? r.n : null;
@@ -414,8 +505,8 @@ async function loadCross() {
     kind: "line",
     yDomain: { yMin: 0, yMax: 10 },
     series: [
-      { name: nameA, color: PALETTE[0], values: avgA },
-      { name: nameB, color: PALETTE[1], values: avgB },
+      { name: nameA, color: PALETTE[0], values: avgA, weights: nA },
+      { name: nameB, color: PALETTE[1], values: avgB, weights: nB },
     ],
     rightSeries: [],
   };
@@ -963,15 +1054,32 @@ onMounted(async () => {
           <div class="section-gap" aria-hidden="true"></div>
           <el-card shadow="never">
             <template #header>因子总表</template>
-            <el-table :data="facOverall" class="app-table" size="small" stripe style="width: 100%">
-              <el-table-column prop="bucket" label="分箱" min-width="120" />
-              <el-table-column prop="n" label="n" min-width="80" align="right" />
-              <el-table-column label="均分" min-width="100" align="right">
-                <template #default="{ row }">{{ fmt(row.avg, 2) }}</template>
-              </el-table-column>
-              <el-table-column label="0分%" min-width="100" align="right">
-                <template #default="{ row }">{{ fmtPct(row.zero_ratio) }}</template>
-              </el-table-column>
+            <el-table :data="facOverallT" class="app-table" size="small" stripe style="width: 100%">
+              <el-table-column prop="label" label="" min-width="80" />
+              <el-table-column
+                v-for="col in facBucketCols"
+                :key="col.key"
+                :prop="col.key"
+                :label="col.label"
+                min-width="90"
+                align="right"
+              />
+            </el-table>
+          </el-card>
+          <div class="section-gap" aria-hidden="true"></div>
+          <el-card shadow="never" class="cross-table-card">
+            <template #header>周期均分明细</template>
+            <el-table :data="facPeriodRows" class="app-table" size="small" stripe style="width: 100%">
+              <el-table-column prop="period" label="周期" min-width="100" />
+              <el-table-column prop="n" label="n" min-width="70" align="right" />
+              <el-table-column
+                v-for="col in facBucketCols"
+                :key="col.key"
+                :prop="col.key"
+                :label="col.label"
+                min-width="90"
+                align="right"
+              />
             </el-table>
           </el-card>
         </el-tab-pane>

@@ -56,9 +56,13 @@ function wantRefresh(url) {
   return v === "1" || v === "true";
 }
 
+/** 统计口径/分档变更时递增，旧缓存自动失效 */
+const CACHE_VER = "v2-4way-zero-inc";
+
 function withDisk(cacheKey, fp, compute, force = false) {
+  const key = `${CACHE_VER}|${cacheKey}`;
   const t0 = Date.now();
-  return withCache(ROOT, cacheKey, fp, compute, force).then((payload) => {
+  return withCache(ROOT, key, fp, compute, force).then((payload) => {
     const ms = Date.now() - t0;
     const hit = !force && ms < 8;
     if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -247,6 +251,7 @@ async function handleApi(req, res, url) {
             overall,
             series: (r.series || []).map((row) => ({
               period: row.period,
+              n: row.n ?? (row.buckets || []).reduce((a, b) => a + (Number(b.n) || 0), 0),
               buckets: (row.buckets || []).map(mapAcc),
             })),
             profile: { backend: "rust", scanMs: Date.now() - t0 },

@@ -45,6 +45,33 @@
         </section>
 
         <section>
+          <h2>任务类型</h2>
+          <label class="field">
+            <span>采集模式</span>
+            <select id="mode">
+              <option value="full_resume">全量续爬（从断点继续）</option>
+              <option value="full_restart">全量重来（从第 1 页）</option>
+              <option value="incremental">增量更新（重复自动停）</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="actions">
+          <button id="btnStart" class="btn primary" type="button">开始采集</button>
+          <button id="btnStop" class="btn danger" type="button" disabled>停止</button>
+        </section>
+
+        <section>
+          <h2>断点</h2>
+          <div id="cursorBox" class="cursor-box">读取中…</div>
+        </section>
+
+        <section>
+          <h2>已存数据</h2>
+          <ul id="gameList" class="game-list"></ul>
+        </section>
+
+        <section>
           <h2>Cookie</h2>
           <label class="field">
             <span>浏览器 Cookie（含 SESSDATA）</span>
@@ -57,15 +84,7 @@
         </section>
 
         <section>
-          <h2>采集模式</h2>
-          <label class="field">
-            <span>任务类型</span>
-            <select id="mode">
-              <option value="full_resume">全量续爬（从断点继续）</option>
-              <option value="full_restart">全量重来（从第 1 页）</option>
-              <option value="incremental">增量更新（重复自动停）</option>
-            </select>
-          </label>
+          <h2>采集参数</h2>
           <div class="grid2">
             <label class="field">
               <span>page_size（≤20）</span>
@@ -103,24 +122,110 @@
             <span>额外保存 raw 页 JSONL</span>
           </label>
         </section>
-
-        <section class="actions">
-          <button id="btnStart" class="btn primary" type="button">开始采集</button>
-          <button id="btnStop" class="btn danger" type="button" disabled>停止</button>
-        </section>
-
-        <section>
-          <h2>断点</h2>
-          <div id="cursorBox" class="cursor-box">读取中…</div>
-        </section>
-
-        <section>
-          <h2>已存数据</h2>
-          <ul id="gameList" class="game-list"></ul>
-        </section>
       </aside>
 
-      
+      <section class="main">
+        <div class="panel progress-panel">
+          <div class="progress-left">
+            <div class="ring">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+                <circle
+                  id="ringFg"
+                  class="ring-fg"
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  stroke-dasharray="326.7"
+                  stroke-dashoffset="326.7"
+                ></circle>
+              </svg>
+              <div class="ring-label">
+                <strong id="pctText">—</strong>
+                <span>进度</span>
+              </div>
+            </div>
+            <div class="progress-copy">
+              <div class="status-line">
+                <span id="statusDot" class="dot"></span>
+                <span id="statusText">空闲</span>
+              </div>
+              <h2 id="progressTitle">—</h2>
+              <div class="progress-bar"><i id="barFg"></i></div>
+            </div>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <span>累计评论</span>
+              <strong id="mCount">—</strong>
+            </div>
+            <div class="metric">
+              <span>本次新增</span>
+              <strong id="mNew">—</strong>
+            </div>
+            <div class="metric">
+              <span>页数</span>
+              <strong id="mPage">—</strong>
+            </div>
+            <div class="metric">
+              <span>速率</span>
+              <strong id="mRate">—</strong><em>/s</em>
+            </div>
+            <div class="metric">
+              <span>预计剩余</span>
+              <strong id="mEta">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>日志</h2>
+            <div class="tools">
+              <button id="btnClearLog" class="btn sm" type="button">清空</button>
+            </div>
+          </div>
+          <div id="log" class="log"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>数据概况</h2>
+          </div>
+          <div class="stats-row">
+            <div class="stat-card">
+              <span>均分</span>
+              <strong id="sAvg">—</strong>
+            </div>
+            <div class="stat-card">
+              <span>用户数</span>
+              <strong id="sUsers">—</strong>
+            </div>
+            <div class="stat-card">
+              <span>时间范围</span>
+              <strong class="sm-strong" id="sRange">—</strong>
+            </div>
+            <div class="stat-card">
+              <span>赞 / 踩</span>
+              <strong class="sm-strong" id="sVotes">—</strong>
+            </div>
+          </div>
+          <div id="gradeChart" class="grade-chart" title="星级分布"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>均分趋势</h2>
+            <div class="hint">
+              本次均分 <strong id="mAvg" style="font-family: var(--mono); color: #c9d6e8">—</strong>
+              · <span id="trendMeta">暂无采样</span>
+            </div>
+          </div>
+          <div id="gradeTrend" class="trend-chart">
+            <div class="empty">暂无均分曲线</div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
   <script src="app.js"></script>

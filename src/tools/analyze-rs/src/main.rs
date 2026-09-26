@@ -200,7 +200,12 @@ fn cmd_factors(path: &str, grain: &str, from: &str, to: &str) {
             out.push(',');
         }
         first = false;
-        out.push_str(&format!("{{\"period\":\"{}\",\"buckets\":[", period));
+        // 周期总 n：供前端按数据量加权平均
+        let period_n: u64 = buckets.iter().map(|bk| m.get(*bk).map(|a| a.n).unwrap_or(0)).sum();
+        out.push_str(&format!(
+            "{{\"period\":\"{}\",\"n\":{},\"buckets\":[",
+            period, period_n
+        ));
         for (i, bk) in buckets.iter().enumerate() {
             if i > 0 {
                 out.push(',');
@@ -541,7 +546,20 @@ fn cmd_keywords(path: &str, name: &str, aliases_csv: &str, grain: &str, from: &s
     }
     let mut periods = String::new();
     let mut first = true;
+    // 全量按样本数加权（不是周期均分的简单平均）
+    let mut ov_all = Acc::default();
+    let mut ov_hit = Acc::default();
+    let mut ov_miss = Acc::default();
     for (period, (all, hit, miss)) in &by {
+        ov_all.n += all.n;
+        ov_all.sum += all.sum;
+        ov_all.zero += all.zero;
+        ov_hit.n += hit.n;
+        ov_hit.sum += hit.sum;
+        ov_hit.zero += hit.zero;
+        ov_miss.n += miss.n;
+        ov_miss.sum += miss.sum;
+        ov_miss.zero += miss.zero;
         let hit_rate = if all.n > 0 {
             hit.n as f64 / all.n as f64
         } else {
@@ -557,8 +575,14 @@ fn cmd_keywords(path: &str, name: &str, aliases_csv: &str, grain: &str, from: &s
         } else {
             None
         };
-        let delta = match (hit_avg, miss_avg) {
-            (Some(h), Some(m)) => Some(h - m),
+        let all_avg = if all.n > 0 {
+            Some(all.sum / all.n as f64)
+        } else {
+            None
+        };
+        // Δ 口径：命中均分 − 全部均分（不是命中−未命中）
+        let delta = match (hit_avg, all_avg) {
+            (Some(h), Some(a)) => Some(h - a),
             _ => None,
         };
         if !first {
@@ -569,7 +593,7 @@ fn cmd_keywords(path: &str, name: &str, aliases_csv: &str, grain: &str, from: &s
             "{{\"period\":\"{}\",\"n\":{},\"avg\":{},\"keywords\":{{\"{}\":{{\"hit_n\":{},\"hit_avg\":{},\"miss_n\":{},\"miss_avg\":{},\"hit_rate\":{:.4},\"delta_hit\":{}}}}}}}",
             period,
             all.n,
-            if all.n > 0 { format!("{:.4}", all.sum / all.n as f64) } else { "null".into() },
+            all_avg.map(|x| format!("{:.4}", x)).unwrap_or("null".into()),
             name,
             hit.n,
             hit_avg.map(|x| format!("{:.4}", x)).unwrap_or("null".into()),
@@ -579,9 +603,43 @@ fn cmd_keywords(path: &str, name: &str, aliases_csv: &str, grain: &str, from: &s
             delta.map(|x| format!("{:.4}", x)).unwrap_or("null".into())
         ));
     }
+    let ov_avg = if ov_all.n > 0 {
+        Some(ov_all.sum / ov_all.n as f64)
+    } else {
+        None
+    };
+    let ov_hit_avg = if ov_hit.n > 0 {
+        Some(ov_hit.sum / ov_hit.n as f64)
+    } else {
+        None
+    };
+    let ov_miss_avg = if ov_miss.n > 0 {
+        Some(ov_miss.sum / ov_miss.n as f64)
+    } else {
+        None
+    };
+    let ov_hit_rate = if ov_all.n > 0 {
+        ov_hit.n as f64 / ov_all.n as f64
+    } else {
+        0.0
+    };
+    let ov_delta = match (ov_hit_avg, ov_avg) {
+        (Some(h), Some(a)) => Some(h - a),
+        _ => None,
+    };
+    let fmt_opt = |x: Option<f64>| x.map(|v| format!("{:.4}", v)).unwrap_or("null".into());
     println!(
-        "{{\"names\":[\"{}\"],\"periods\":[{}]}}",
-        name, periods
+        "{{\"names\":[\"{}\"],\"overview\":{{\"n\":{},\"hit_n\":{},\"miss_n\":{},\"avg\":{},\"hit_avg\":{},\"miss_avg\":{},\"hit_rate\":{:.4},\"delta_hit\":{}}},\"periods\":[{}]}}",
+        name,
+        ov_all.n,
+        ov_hit.n,
+        ov_miss.n,
+        fmt_opt(ov_avg),
+        fmt_opt(ov_hit_avg),
+        fmt_opt(ov_miss_avg),
+        ov_hit_rate,
+        fmt_opt(ov_delta),
+        periods
     );
 }
 

@@ -30,6 +30,26 @@ function ensureOverlay(canvas) {
   return tip;
 }
 
+/** 按样本量加权平均；values 与 weights 同下标对齐，null 点跳过且不占权重位 */
+function weightedMean(values, weights) {
+  let sw = 0;
+  let s = 0;
+  values.forEach((v, i) => {
+    if (v == null || !Number.isFinite(v)) return;
+    const w = weights && Number.isFinite(weights[i]) ? weights[i] : 1;
+    if (w <= 0) return;
+    s += v * w;
+    sw += w;
+  });
+  return sw ? s / sw : null;
+}
+
+function seriesMean(s) {
+  // meanOverride：跨序列口径（如 Δ=命中μ−全部μ），优先于「点值加权」
+  if (s.meanOverride != null && Number.isFinite(s.meanOverride)) return Number(s.meanOverride);
+  return weightedMean(s.values || [], s.weights);
+}
+
 function formatNum(v) {
   if (v == null || !Number.isFinite(v)) return "—";
   if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + "k";
@@ -155,15 +175,13 @@ export function createChart(canvas, legendEl, opts = {}) {
     const meanLabelTexts = [];
     if (state.showMean) {
       for (const s of visPre) {
-        const nums = s.values.filter((v) => v != null && Number.isFinite(v));
-        if (!nums.length) continue;
-        const mu = nums.reduce((a, b) => a + b, 0) / nums.length;
+        const mu = seriesMean(s);
+        if (mu == null) continue;
         meanLabelTexts.push(`${shortName(s.name)} μ=${fmtMu(mu)}`);
       }
       for (const s of rightPre) {
-        const nums = s.values.filter((v) => v != null && Number.isFinite(v));
-        if (!nums.length) continue;
-        const mu = nums.reduce((a, b) => a + b, 0) / nums.length;
+        const mu = seriesMean(s);
+        if (mu == null) continue;
         if ((s.format || "pct") === "pct") meanLabelTexts.push(`命中率：${(mu * 100).toFixed(2)}%`);
         else meanLabelTexts.push(`${shortName(s.name)} μ=${formatNum(mu)}`);
       }
@@ -349,9 +367,8 @@ export function createChart(canvas, legendEl, opts = {}) {
         const means = [];
         for (const s of vis) {
           const color = s.color || PALETTE[s._i % PALETTE.length];
-          const nums = s.values.filter((v) => v != null && Number.isFinite(v));
-          if (!nums.length) continue;
-          const mu = nums.reduce((a, b) => a + b, 0) / nums.length;
+          const mu = seriesMean(s);
+          if (mu == null) continue;
           const y = t + h - (Math.max(0, mu) / maxBar) * h;
           means.push({ name: s.name, color, mu, y });
         }
@@ -450,9 +467,8 @@ export function createChart(canvas, legendEl, opts = {}) {
         const means = [];
         for (const s of vis) {
           const color = s.color || PALETTE[s._i % PALETTE.length];
-          const nums = s.values.filter((v) => v != null && Number.isFinite(v));
-          if (!nums.length) continue;
-          const mu = nums.reduce((a, b) => a + b, 0) / nums.length;
+          const mu = seriesMean(s);
+          if (mu == null) continue;
           const muText =
             s.format === "pct"
               ? `${shortName(s.name)} μ=${(mu * 100).toFixed(2)}%`
@@ -468,9 +484,8 @@ export function createChart(canvas, legendEl, opts = {}) {
         }
         for (const s of rightVis) {
           const color = s.color || "#0ea5e9";
-          const nums = s.values.filter((v) => v != null && Number.isFinite(v));
-          if (!nums.length) continue;
-          const mu = nums.reduce((a, b) => a + b, 0) / nums.length;
+          const mu = seriesMean(s);
+          if (mu == null) continue;
           const rFmt = s.format || "pct";
           means.push({
             name: s.name,

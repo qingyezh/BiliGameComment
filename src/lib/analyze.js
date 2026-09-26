@@ -202,7 +202,8 @@ export async function buildSeries(gameId, root, { grain = "month", from, to, key
       o.miss_n = m.n;
       o.miss_avg = m.avg;
       o.hit_rate = o.n ? +(h.n / o.n).toFixed(4) : null;
-      o.delta_hit = h.avg != null && m.avg != null ? +(h.avg - m.avg).toFixed(4) : null;
+      // Δ 口径：命中均分 − 全部均分（不是命中−未命中）
+      o.delta_hit = h.avg != null && o.avg != null ? +(h.avg - o.avg).toFixed(4) : null;
     }
     prevAvg.set(row.period, o);
   }
@@ -280,13 +281,16 @@ export async function buildFactors(gameId, root, { grain = "month", factor = "pl
     grain,
     buckets,
     overall: buckets.map((b) => ({ bucket: b, ...accOut(overall.get(b)) })),
-    series: periods.map((p) => ({
-      period: p,
-      buckets: buckets.map((b) => {
-        const a = byPeriodFactor.get(p).get(b);
+    series: periods.map((p) => {
+      const m = byPeriodFactor.get(p);
+      let periodN = 0;
+      const bucketsOut = buckets.map((b) => {
+        const a = m.get(b);
+        if (a) periodN += a.n;
         return { bucket: b, ...(a ? accOut(a) : { n: 0, avg: null, zero_ratio: null }) };
-      }),
-    })),
+      });
+      return { period: p, n: periodN, buckets: bucketsOut };
+    }),
   };
 }
 
@@ -376,6 +380,9 @@ export async function buildKeywords(gameId, root, { grain = "month", from, to, d
   }
 
   const byPeriod = new Map();
+  const ovAll = accCreate();
+  const ovHit = accCreate();
+  const ovMiss = accCreate();
   for await (const c of readComments(gameId, root)) {
     const pk = periodKey(c.publish_time, grain);
     if (!pk) continue;
@@ -392,18 +399,40 @@ export async function buildKeywords(gameId, root, { grain = "month", from, to, d
     }
     const row = byPeriod.get(pk);
     accAdd(row.all, gm);
+    accAdd(ovAll, gm);
+    let anyHit = false;
     for (const n of names) {
       const wordsN = map.get(n);
       const isHit = findHits(text, wordsN).length > 0;
-      if (isHit) accAdd(row.entries[n].hit, gm);
-      else accAdd(row.entries[n].miss, gm);
+      if (isHit) {
+        anyHit = true;
+        accAdd(row.entries[n].hit, gm);
+      } else {
+        accAdd(row.entries[n].miss, gm);
+      }
     }
+    // overview：命中任一词条记 hit，否则 miss（单词条时与 Rust 一致）
+    if (anyHit) accAdd(ovHit, gm);
+    else accAdd(ovMiss, gm);
   }
 
   const periods = [...byPeriod.values()].sort((a, b) => a.period.localeCompare(b.period));
+  const ovAvg = ovAll.n ? +(ovAll.sum / ovAll.n).toFixed(4) : null;
+  const ovHitAvg = ovHit.n ? +(ovHit.sum / ovHit.n).toFixed(4) : null;
+  const ovMissAvg = ovMiss.n ? +(ovMiss.sum / ovMiss.n).toFixed(4) : null;
   return {
     grain,
     names,
+    overview: {
+      n: ovAll.n,
+      hit_n: ovHit.n,
+      miss_n: ovMiss.n,
+      avg: ovAvg,
+      hit_avg: ovHitAvg,
+      miss_avg: ovMissAvg,
+      hit_rate: ovAll.n ? +(ovHit.n / ovAll.n).toFixed(4) : null,
+      delta_hit: ovHitAvg != null && ovAvg != null ? +(ovHitAvg - ovAvg).toFixed(4) : null,
+    },
     periods: periods.map((p) => {
       const o = accOut(p.all);
       o.period = p.period;
@@ -417,7 +446,8 @@ export async function buildKeywords(gameId, root, { grain = "month", from, to, d
           miss_n: m.n,
           miss_avg: m.avg,
           hit_rate: o.n ? +(h.n / o.n).toFixed(4) : null,
-          delta_hit: h.avg != null && m.avg != null ? +(h.avg - m.avg).toFixed(4) : null,
+          // Δ 口径：命中均分 − 全部均分
+          delta_hit: h.avg != null && o.avg != null ? +(h.avg - o.avg).toFixed(4) : null,
         };
       }
       return o;
