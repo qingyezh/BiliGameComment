@@ -1,11 +1,64 @@
+# 依赖
 node_modules/
+
+# 本地密钥 / Cookie / 个人配置
 config.local.json
+*.local.json
+.env
+.env.*
+
+# 采集与分析数据（体积大、可重建）
 data/
 app/data/
 app/cache/
-app/dist/
 app/logs/
+
+# 构建产物
+app/dist/
+dist/
 src/tools/analyze-rs/target/
-temp/
+app/bin/
+*.exe
+*.pdb
+*.dll
+
+# 日志与本地版本记录
 *.log
+logs/
 version.md
+
+# 临时文件
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# 备份文件
+*.bak
+*.backup
+*.backup.*
+*.orig
+*.old
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+Desktop.ini
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.code-workspace
+*.suo
+*.user
+
+# 压缩包 / 一次性导出
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
